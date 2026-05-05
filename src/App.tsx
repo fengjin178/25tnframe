@@ -324,9 +324,10 @@ const groupPost: Post = {
 };
 
 const groups = [
-  { id: "yinanping", name: "意难平互助会", founder: "华妃发起", status: "锁定", deadOnly: true },
-  { id: "garden", name: "御花园茶话局", founder: "甄嬛发起", status: "未申请", deadOnly: false },
-  { id: "strategy", name: "太后权谋夜谈", founder: "芈月发起", status: "审核中", deadOnly: false },
+  { id: "yinanping", name: "意难平互助会", founder: "华妃发起", status: "锁定", deadOnly: true, members: ["hua-fei", "fuheng", "chunyuan"], color: "#7B5EA7", bgColor: "#F0EAF8", textColor: "#7B5EA7" },
+  { id: "power-women", name: "权谋女性观察室", founder: "华妃发起", status: "未申请", deadOnly: false, members: ["hua-fei", "wei-yingluo", "zhenhuan", "miyue"], color: "#C4643A", bgColor: "#F7E3D6", textColor: "#C4643A" },
+  { id: "garden", name: "御花园茶话局", founder: "甄嬛发起", status: "未申请", deadOnly: false, members: ["zhenhuan", "wei-yingluo", "miyue"], color: "#3AA56B", bgColor: "#E3F5EC", textColor: "#3AA56B" },
+  { id: "strategy", name: "太后权谋夜谈", founder: "芈月发起", status: "审核中", deadOnly: false, members: ["zhenhuan", "miyue"], color: "#4A7A8A", bgColor: "#DDECEF", textColor: "#4A7A8A" },
 ];
 
 const comments: Record<string, Comment[]> = {
@@ -348,8 +349,11 @@ type AppState = {
   emotionPosts: Record<string, Post[]>;
   carriedLetterIds: string[];
   carriedCount: number;
+  interactionCounts: Record<string, number>;
+  incrementInteraction: (characterId: string) => void;
   requestFriend: (character: Character) => void;
   carryLetter: (from: Character, letter: Letter) => void;
+  showToast: (message: string) => void;
   toast: string | null;
   clearToast: () => void;
 };
@@ -366,6 +370,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [friendOverrides, setFriendOverrides] = useState<Record<string, FriendStatus>>({});
   const [emotionPosts, setEmotionPosts] = useState<Record<string, Post[]>>({});
   const [carriedLetterIds, setCarriedLetterIds] = useState<string[]>([]);
+  const [interactionCounts, setInteractionCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
   const allCharacters = useMemo(
@@ -376,6 +381,10 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 2800);
+  };
+
+  const incrementInteraction = (characterId: string) => {
+    setInteractionCounts((prev) => ({ ...prev, [characterId]: (prev[characterId] ?? 0) + 1 }));
   };
 
   const requestFriend = (character: Character) => {
@@ -392,31 +401,41 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     if (!letter.to_character_alive || carriedLetterIds.includes(letter.id)) return;
     const target = allCharacters.find((item) => item.name === letter.to_character);
     setCarriedLetterIds((prev) => [...prev, letter.id]);
-    if (target) {
-      setEmotionPosts((prev) => ({
-        ...prev,
-        [target.id]: [
-          ...(prev[target.id] ?? []),
-          {
-            id: `emotion-${letter.id}`,
-            characterId: target.id,
-            type: "情绪波动",
-            time: "刚刚",
-            note: "因为有观众从逝者空间带回了一丝回声",
-            text:
-              from.id === "hua-fei"
-                ? "忽然觉得，世上所谓恩宠不过是一场误认。有人看清得早，有人看清得太晚。"
-                : "今日心里像有一页旧纸轻轻翻过去。若不必像任何人，也许才算真正活着。",
-          },
-        ],
-      }));
-    }
     showToast(`你将这封信带回了生者空间，${letter.to_character}也许会有所感知`);
+    if (!target) return;
+    // 调用 AI 生成情绪波动帖
+    fetch("/api/feed/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ characterId: target.id, triggerType: "unsent_letter", context: letter.content }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.post?.content) {
+          setEmotionPosts((prev) => ({
+            ...prev,
+            [target.id]: [
+              ...(prev[target.id] ?? []),
+              {
+                id: `emotion-${letter.id}`,
+                characterId: target.id,
+                type: "情绪波动",
+                time: "刚刚",
+                note: "因为有观众从逝者空间带回了一丝回声",
+                text: data.post.content,
+              },
+            ],
+          }));
+        }
+      })
+      .catch(() => {
+        // 静默失败，不影响主流程
+      });
   };
 
   return (
     <AppContext.Provider
-      value={{ allCharacters, emotionPosts, carriedLetterIds, carriedCount: carriedLetterIds.length, requestFriend, carryLetter, toast, clearToast: () => setToast(null) }}
+      value={{ allCharacters, emotionPosts, carriedLetterIds, carriedCount: carriedLetterIds.length, interactionCounts, incrementInteraction, requestFriend, carryLetter, showToast, toast, clearToast: () => setToast(null) }}
     >
       {children}
       <Toast />
@@ -552,7 +571,23 @@ function FeedPage() {
 
 function PostCard({ character, post }: { character: Character; post: Post }) {
   const navigate = useNavigate();
+  const { showToast } = useApp();
   const isGroup = post.type === "群组动态";
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(() => Math.floor(Math.random() * 3000) + 100);
+  const [showComments, setShowComments] = useState(false);
+
+  const handleLike = () => {
+    setLiked((prev) => {
+      setLikeCount((c) => c + (prev ? -1 : 1));
+      return !prev;
+    });
+  };
+
+  const handleShare = () => {
+    showToast("已转发到你的动态");
+  };
+
   return (
     <article className={`rounded-xl border border-black/[0.08] p-4 shadow-[0_10px_28px_rgba(70,45,20,0.06)] ${isGroup ? "bg-[#F5F0F8]" : "bg-white"}`}>
       {post.source && (
@@ -586,11 +621,18 @@ function PostCard({ character, post }: { character: Character; post: Post }) {
       {post.note && <p className="mb-2 rounded-lg bg-[#FAF7F2] px-3 py-2 text-xs leading-5 text-[#8A7461]">{post.note}</p>}
       <p className="whitespace-pre-line font-serif text-[15px] leading-7 text-[#292018]">{post.text}</p>
       <div className="mt-4 flex items-center justify-between border-t border-black/[0.06] pt-3 text-sm font-semibold text-[#766D62]">
-        <button className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4" />评论</button>
-        <button className="flex items-center gap-1.5"><Heart className="h-4 w-4" />点赞</button>
-        <button className="flex items-center gap-1.5"><Share2 className="h-4 w-4" />转发</button>
+        <button onClick={() => setShowComments((v) => !v)} className={`flex items-center gap-1.5 transition-colors ${showComments ? "text-[#C4643A]" : ""}`}>
+          <MessageCircle className="h-4 w-4" />评论
+        </button>
+        <button onClick={handleLike} className={`flex items-center gap-1.5 transition-colors ${liked ? "text-[#C4643A]" : ""}`}>
+          <Heart className={`h-4 w-4 transition-all ${liked ? "fill-[#C4643A] text-[#C4643A] scale-110" : ""}`} />
+          {likeCount.toLocaleString()}
+        </button>
+        <button onClick={handleShare} className="flex items-center gap-1.5 active:text-[#C4643A]">
+          <Share2 className="h-4 w-4" />转发
+        </button>
       </div>
-      <CommentBlock post={post} character={character} />
+      {showComments && <CommentBlock post={post} character={character} />}
     </article>
   );
 }
@@ -615,17 +657,55 @@ function StackedAvatars({ ids }: { ids: string[] }) {
 function CommentBlock({ post, character }: { post: Post; character: Character }) {
   const [draft, setDraft] = useState("");
   const [asRole, setAsRole] = useState("viewer");
-  const list = comments[post.id] ?? [];
+  const [localComments, setLocalComments] = useState<Comment[]>(comments[post.id] ?? []);
+  const [submitting, setSubmitting] = useState(false);
   const selected = asRole === "viewer" ? null : byId(asRole);
   const canRoleComment = !selected || selected.is_alive === character.is_alive;
   const mentions = mentionOptions(character);
 
+  const submitComment = async () => {
+    const text = draft.trim();
+    if (!text || submitting) return;
+    setSubmitting(true);
+
+    if (asRole === "viewer") {
+      setLocalComments((prev) => [...prev, { id: `user-${Date.now()}`, authorName: "我", text, likes: 0 }]);
+      setDraft("");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!canRoleComment) {
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/comments/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postCharacterId: character.id, postContent: post.text, commenterId: asRole, commenterRole: "character" }),
+      });
+      const data = await res.json();
+      if (data.blocked) {
+        setLocalComments((prev) => [...prev, { id: `blocked-${Date.now()}`, authorName: "系统", text: data.reason, likes: 0 }]);
+      } else if (data.text) {
+        setLocalComments((prev) => [...prev, { id: `ai-${Date.now()}`, characterId: data.commenterId, text: data.text, likes: 0 }]);
+      }
+    } catch {
+      const commenter = byId(asRole);
+      setLocalComments((prev) => [...prev, { id: `fb-${Date.now()}`, characterId: asRole, text: `${commenter.name}沉默片刻，没有说话。`, likes: 0 }]);
+    }
+    setDraft("");
+    setSubmitting(false);
+  };
+
   return (
     <section className="mt-4 space-y-3 border-t border-black/[0.06] pt-3">
-      {list.length > 0 && (
+      {localComments.length > 0 && (
         <div className={`rounded-xl p-3 ${character.is_alive ? "bg-[#FDF8F0]" : "bg-[#F0F4F8]"}`}>
-          <p className="mb-2 text-[11px] font-bold text-[#766D62]">角色评论</p>
-          {list.map((comment) => <CommentItem key={comment.id} comment={comment} />)}
+          <p className="mb-2 text-[11px] font-bold text-[#766D62]">评论</p>
+          {localComments.map((comment) => <CommentItem key={comment.id} comment={comment} />)}
         </div>
       )}
       <div className="rounded-xl bg-[#FAF7F2] p-3">
@@ -636,7 +716,22 @@ function CommentBlock({ post, character }: { post: Post; character: Character })
           </select>
         </div>
         {!canRoleComment && <p className="mb-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#4A7A8A]">生者与逝者之间无法直接交流</p>}
-        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="评论或输入@提及角色" className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none" />
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && submitComment()}
+            placeholder={asRole === "viewer" ? "写下你的评论" : `以${byId(asRole).name}的身份评论`}
+            className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none"
+          />
+          <button
+            onClick={submitComment}
+            disabled={!draft.trim() || submitting || (!canRoleComment && asRole !== "viewer")}
+            className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white disabled:bg-[#CFC8BF] ${character.is_alive ? "bg-[#C4643A]" : "bg-[#4A7A8A]"}`}
+          >
+            {submitting ? "…" : "发送"}
+          </button>
+        </div>
         {draft.includes("@") && (
           <div className="mt-2 grid gap-1">
             {mentions.map((item) => (
@@ -678,11 +773,18 @@ function mentionOptions(character: Character) {
 }
 
 function UnlockCard({ character }: { character: Character }) {
+  const { interactionCounts } = useApp();
+  const count = Math.min(interactionCounts[character.id] ?? 0, 3);
   return (
     <section className="rounded-xl border border-dashed border-[#B8AFA5] bg-white/50 p-4">
       <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#554B42]"><Lock className="h-4 w-4" />隐藏番外</div>
-      <p className="font-serif text-sm leading-6 text-[#766D62]">她后来再提起那一炉香时，只说“人心比香灰冷得更快”。</p>
-      <p className="mt-3 text-xs font-semibold text-[#A06B4F]">与{character.name}互动3次后解锁 · 已解锁 1/3</p>
+      <p className="font-serif text-sm leading-6 text-[#766D62]">她后来再提起那一炉香时，只说"人心比香灰冷得更快"。</p>
+      <div className="mt-3">
+        <div className="h-1.5 rounded-full bg-[#E5DFD9]">
+          <div className="h-1.5 rounded-full bg-[#C4643A] transition-all duration-500" style={{ width: `${(count / 3) * 100}%` }} />
+        </div>
+        <p className="mt-2 text-xs font-semibold text-[#A06B4F]">与{character.name}互动3次后解锁 · 已解锁 {count}/3</p>
+      </div>
     </section>
   );
 }
@@ -733,21 +835,31 @@ function DramaList() {
 
 function GroupList() {
   const navigate = useNavigate();
+  const { interactionCounts } = useApp();
+  const yinanpingProgress = Math.min(
+    (interactionCounts["hua-fei"] ?? 0) + (interactionCounts["fuheng"] ?? 0) + (interactionCounts["chunyuan"] ?? 0),
+    5,
+  );
   return (
     <div className="space-y-3">
       {groups.map((group) => (
-        <button key={group.id} onClick={() => group.id === "yinanping" && navigate("/group/yinanping")} className="w-full rounded-xl border border-black/[0.08] bg-white p-4 text-left">
+        <button key={group.id} onClick={() => navigate(`/group/${group.id}`)} className="w-full rounded-xl border border-black/[0.08] bg-white p-4 text-left">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-black">{group.name}</h2>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <StackedAvatars ids={group.members} />
+                <h2 className="font-black">{group.name}</h2>
+              </div>
               <p className="mt-1 text-xs text-[#766D62]">{group.founder} · {group.deadOnly ? "仅逝者可加入" : "生者可申请"}</p>
             </div>
-            <span className={`rounded-full px-2 py-1 text-xs font-bold ${group.id === "yinanping" ? "bg-[#F0EAF8] text-[#7B5EA7]" : "bg-[#FAF7F2] text-[#766D62]"}`}>{group.status}</span>
+            <span className="ml-3 shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ backgroundColor: group.bgColor, color: group.textColor }}>{group.status}</span>
           </div>
           {group.id === "yinanping" && (
             <div className="mt-3">
-              <div className="h-2 rounded-full bg-[#E5DFE9]"><div className="h-2 w-[60%] rounded-full bg-[#7B5EA7]" /></div>
-              <p className="mt-2 text-xs text-[#766D62]">与华妃、傅恒、纯元皇后任意一人互动超过5次 · 当前 3/5</p>
+              <div className="h-2 rounded-full bg-[#E5DFE9]">
+                <div className="h-2 rounded-full bg-[#7B5EA7] transition-all duration-500" style={{ width: `${(yinanpingProgress / 5) * 100}%` }} />
+              </div>
+              <p className="mt-2 text-xs text-[#766D62]">与华妃、傅恒、纯元皇后任意一人互动超过5次 · 当前 {yinanpingProgress}/5</p>
             </div>
           )}
         </button>
@@ -909,7 +1021,7 @@ const chatProfiles: Record<string, { delay: [number, number]; bubble: string; sy
 };
 
 function ChatPage() {
-  const { allCharacters } = useApp();
+  const { allCharacters, incrementInteraction } = useApp();
   const { characterId } = useParams();
   const navigate = useNavigate();
   const character = allCharacters.find((item) => item.id === characterId) ?? allCharacters[0];
@@ -941,11 +1053,13 @@ function ChatPage() {
       if (!response.ok) throw new Error("chat request failed");
       const data = await response.json();
       setMessages((prev) => [...prev, { from: "character", text: data.reply || profile.replies[0] || "我在听。" }]);
+      incrementInteraction(character.id);
     } catch {
       const [min, max] = profile.delay;
       window.setTimeout(() => {
         const reply = profile.replies[Math.floor(Math.random() * profile.replies.length)] || "我在听。";
         setMessages((prev) => [...prev, { from: "character", text: reply }]);
+        incrementInteraction(character.id);
       }, Math.min(900, min + Math.random() * (max - min)));
     } finally {
       setTyping(false);
@@ -986,13 +1100,19 @@ function Bubble({ message, character, bubbleClass }: { message: ChatMessage; cha
 
 function GroupPage() {
   const navigate = useNavigate();
+  const { groupId } = useParams<{ groupId: string }>();
+  const group = groups.find((g) => g.id === groupId) ?? groups[0];
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { from: "character", characterId: "hua-fei", text: "本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里。" },
-    { from: "character", characterId: "fuheng", text: "有些结局，不是想接受，只是已经无法更改。" },
-    { from: "character", characterId: "chunyuan", text: "......" },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const firstMember = byId(group.members[0]);
+    const secondMember = group.members[1] ? byId(group.members[1]) : null;
+    return [
+      { from: "character", characterId: group.members[0], text: group.id === "yinanping" ? "本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里。" : `${firstMember.name}在此。` },
+      ...(secondMember ? [{ from: "character" as const, characterId: group.members[1], text: group.id === "yinanping" ? "有些结局，不是想接受，只是已经无法更改。" : `${secondMember.name}也在。` }] : []),
+    ];
+  });
   const [loading, setLoading] = useState(false);
+
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -1001,7 +1121,7 @@ function GroupPage() {
     setInput("");
     setLoading(true);
     try {
-      const response = await fetch("/api/groups/yinanping/messages", {
+      const response = await fetch(`/api/groups/${group.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, history: messages }),
@@ -1011,21 +1131,27 @@ function GroupPage() {
       const incoming: ChatMessage[] = Array.isArray(data.messages)
         ? data.messages.map((item: { speakerId: string; text: string }) => ({ from: "character", characterId: item.speakerId, text: item.text }))
         : [];
-      setMessages((prev) => [...prev, ...(incoming.length ? incoming : [{ from: "character", characterId: "hua-fei", text: "本宫倒要看看，这话还能问出什么答案。" }])]);
+      setMessages((prev) => [...prev, ...(incoming.length ? incoming : [{ from: "character", characterId: group.members[0], text: "……" }])]);
     } catch {
-      setMessages((prev) => [...prev, { from: "character", characterId: "hua-fei", text: "本宫从前也以为，只要爱得够狠，就能赢。后来才知道，狠不过人心，也狠不过圣意。" }]);
+      setMessages((prev) => [...prev, { from: "character", characterId: group.members[0], text: "……" }]);
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <main className="min-h-screen bg-[#FAF7F2] text-[#1A1611]">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col">
-        <header className="border-b border-black/[0.06] bg-[#F5F0F8] px-4 py-3">
-          <button onClick={() => navigate(-1)} className="mb-3 flex items-center gap-1 text-sm font-bold text-[#7B5EA7]"><ChevronLeft className="h-4 w-4" /> 返回</button>
-          <div className="flex items-center gap-3"><StackedAvatars ids={["hua-fei", "fuheng", "chunyuan"]} /><div><h1 className="text-xl font-black text-[#4B365E]">意难平互助会</h1><p className="text-xs text-[#766D62]">发起人：华妃 · 成员：华妃、傅恒、纯元皇后</p></div></div>
-          <p className="mt-3 rounded-xl bg-white/70 p-3 text-xs leading-5 text-[#766D62]">本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里，以及凭什么接受这个结局。</p>
-          <p className="mt-2 text-[11px] text-[#7B5EA7]">已接入：/api/groups/yinanping/messages</p>
+        <header className="border-b border-black/[0.06] px-4 py-3" style={{ backgroundColor: `${group.bgColor}cc` }}>
+          <button onClick={() => navigate(-1)} className="mb-3 flex items-center gap-1 text-sm font-bold" style={{ color: group.textColor }}><ChevronLeft className="h-4 w-4" /> 返回</button>
+          <div className="flex items-center gap-3">
+            <StackedAvatars ids={group.members} />
+            <div>
+              <h1 className="text-xl font-black" style={{ color: group.textColor }}>{group.name}</h1>
+              <p className="text-xs text-[#766D62]">发起人：{group.founder} · 成员：{group.members.map((id) => byId(id).name).join("、")}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px]" style={{ color: group.textColor }}>已接入：/api/groups/{group.id}/messages</p>
         </header>
         <section className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.map((message, index) => {
@@ -1041,7 +1167,12 @@ function GroupPage() {
             );
           })}
         </section>
-        <footer className="border-t border-black/[0.06] bg-[#FAF7F2] p-3"><div className="flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white p-2"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && send()} placeholder={loading ? "角色正在回应..." : "以观众身份发言"} className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" /><button onClick={send} disabled={loading} className="grid h-10 w-10 place-items-center rounded-lg bg-[#7B5EA7] text-white disabled:bg-[#B8A8C8]"><Send className="h-4 w-4" /></button></div></footer>
+        <footer className="border-t border-black/[0.06] bg-[#FAF7F2] p-3">
+          <div className="flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white p-2">
+            <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && send()} placeholder={loading ? "角色正在回应..." : "以观众身份发言"} className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" />
+            <button onClick={send} disabled={loading} className="grid h-10 w-10 place-items-center rounded-lg text-white disabled:opacity-50" style={{ backgroundColor: group.color }}><Send className="h-4 w-4" /></button>
+          </div>
+        </footer>
       </div>
     </main>
   );
@@ -1075,12 +1206,12 @@ function Shell() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/character/:characterId" element={<CharacterPage />} />
         <Route path="/chat/:characterId" element={<ChatPage />} />
-        <Route path="/group/yinanping" element={<GroupPage />} />
+        <Route path="/group/:groupId" element={<GroupPage />} />
         <Route path="*" element={<Navigate to="/feed" replace />} />
       </Routes>
       <Routes>
         <Route path="/chat/:characterId" element={null} />
-        <Route path="/group/yinanping" element={null} />
+        <Route path="/group/:groupId" element={null} />
         <Route path="*" element={<BottomNav />} />
       </Routes>
     </>
