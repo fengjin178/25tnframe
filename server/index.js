@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { characters, getCharacterById } from "./data/characters.js";
 import { feedSeeds } from "./data/feedSeeds.js";
 import { getGroupById } from "./data/groups.js";
+import { dramas } from "./data/dramas.js";
 import { generateChatCompletion } from "./services/aiClient.js";
 import { getRelevantMemories } from "./services/memoryRetriever.js";
 import { buildCharacterSystemPrompt } from "./services/promptBuilder.js";
@@ -209,6 +210,72 @@ app.post("/api/feed/generate", async (req, res) => {
       emotionTag: triggerType === "unsent_letter" ? "未寄出的执念" : inferEmotion(character, content),
       visibility: "public",
       comments: [],
+    },
+  });
+});
+
+app.get("/api/dramas", (_req, res) => {
+  res.json({ dramas });
+});
+
+app.get("/api/dramas/:dramaId/characters", (req, res) => {
+  const drama = dramas.find((d) => d.id === req.params.dramaId);
+  if (!drama) return res.status(404).json({ error: "Drama not found" });
+  const dramaCharacters = drama.characterIds.map(getCharacterById).filter(Boolean);
+  res.json({ characters: dramaCharacters });
+});
+
+app.post("/api/cards/recommend", async (req, res) => {
+  const { toCharacterId, recommendedCharacterId } = req.body ?? {};
+  const toCharacter = getCharacterById(toCharacterId);
+  const recommendedCharacter = getCharacterById(recommendedCharacterId);
+
+  if (!toCharacter || !recommendedCharacter) {
+    return res.status(404).json({ error: "Character not found" });
+  }
+
+  if (toCharacter.spaceType !== recommendedCharacter.spaceType) {
+    return res.status(400).json({ error: "Cannot recommend across spaces" });
+  }
+
+  const dramaCrossed = toCharacter.source !== recommendedCharacter.source;
+  const relationHint = dramaCrossed
+    ? `两人来自不同剧集（${toCharacter.source}和${recommendedCharacter.source}），在第25帧观众空间相遇。`
+    : `两人同属《${toCharacter.source}》，在剧中可能有过交集。`;
+
+  const prompt = `你是${toCharacter.name}（来自《${toCharacter.source}》）。
+有观众向你推荐了${recommendedCharacter.name}（来自《${recommendedCharacter.source}》）的名片。
+${relationHint}
+${recommendedCharacter.name}的角色特质：${recommendedCharacter.personality || recommendedCharacter.role || ""}
+
+请以你的人格和语气，对这次推荐作出回应（30-60字）。
+可以感兴趣、礼貌拒绝、表示听说过、或保持观察。
+不要说"我是AI"，不要改写原剧情，不要超出角色认知范围。
+
+同时，请判断你的态度：accepted（接受名片，愿意认识）、interested（感兴趣但观望）、rejected（婉拒）。
+
+只返回 JSON，格式：{"responseText":"...","decision":"accepted|interested|rejected"}`;
+
+  const raw = await generateChatCompletion([
+    { role: "system", content: prompt },
+    { role: "user", content: "请回应这张名片推荐。" },
+  ], {
+    temperature: 0.8,
+    maxTokens: 200,
+    responseFormat: { type: "json_object" },
+    fallbackText: `{"responseText":"${toCharacter.name}沉默片刻，将名片收了起来。","decision":"interested"}`,
+  });
+
+  const parsed = safeJsonParse(raw, { responseText: `${toCharacter.name}沉默片刻，将名片收了起来。`, decision: "interested" });
+
+  res.json({
+    card: {
+      targetCharacterId: toCharacter.id,
+      recommendedCharacterId: recommendedCharacter.id,
+      space: toCharacter.spaceType,
+      dramaCrossed,
+      decision: parsed.decision ?? "interested",
+      responseText: parsed.responseText ?? `${toCharacter.name}沉默片刻，将名片收了起来。`,
     },
   });
 });
