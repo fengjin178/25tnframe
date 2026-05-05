@@ -77,6 +77,19 @@ type Post = {
   group?: { name: string; founder: string; members: string[]; intro: string };
 };
 
+type ApiFeedPost = {
+  id: string;
+  characterId: string;
+  characterName: string;
+  source: string;
+  spaceType: "living" | "deceased" | "mixed";
+  postType: string;
+  content: string;
+  emotionTag?: string;
+  visibility?: string;
+  comments?: Array<{ id: string; characterId?: string; characterName?: string; text: string }>;
+};
+
 type Comment = {
   id: string;
   characterId?: string;
@@ -137,7 +150,7 @@ const characters: Character[] = [
     ],
   },
   {
-    id: "zhen-huan-late",
+    id: "zhenhuan",
     name: "甄嬛",
     initial: "嬛",
     drama: "甄嬛传",
@@ -145,12 +158,12 @@ const characters: Character[] = [
     is_alive: true,
     status: "online",
     friend_status: "friend",
-    personality_type: "黑化成长型_权谋成熟",
-    social_style: "克制，但关系一旦建立极为深刻",
+    personality_type: "完结后最终人格_权力幸存者_清醒克制",
+    social_style: "高度克制，能看穿他人情绪，但不轻易外露",
     sample_posts: [
       {
         id: "post-zhen-001",
-        characterId: "zhen-huan-late",
+        characterId: "zhenhuan",
         type: "剧后生活",
         text: "今日抄完《心经》，想起从前在甘露寺。棋局已终，再执子又如何。",
         time: "2小时前",
@@ -158,7 +171,7 @@ const characters: Character[] = [
     ],
   },
   {
-    id: "chun-yuan",
+    id: "chunyuan",
     name: "纯元皇后",
     initial: "纯",
     drama: "甄嬛传",
@@ -201,7 +214,7 @@ const characters: Character[] = [
     ],
   },
   {
-    id: "fu-heng",
+    id: "fuheng",
     name: "傅恒",
     initial: "傅",
     drama: "延禧攻略",
@@ -214,7 +227,7 @@ const characters: Character[] = [
     social_style: "话不多，情绪深藏",
   },
   {
-    id: "mi-yue",
+    id: "miyue",
     name: "芈月",
     initial: "芈",
     drama: "芈月传",
@@ -227,7 +240,7 @@ const characters: Character[] = [
     sample_posts: [
       {
         id: "post-miyue-001",
-        characterId: "mi-yue",
+        characterId: "miyue",
         type: "剧后生活",
         text: "爱若能托付天下，天下早就太平了。",
         time: "昨天",
@@ -252,7 +265,7 @@ const crossDramaFriendships: CrossRelation[] = [
   {
     id: "rel-001",
     character_a: "hua-fei",
-    character_b: "fu-heng",
+    character_b: "fuheng",
     space: "逝者空间",
     both_alive: false,
     relation_type: "意难平互助",
@@ -263,7 +276,7 @@ const crossDramaFriendships: CrossRelation[] = [
   },
   {
     id: "rel-002",
-    character_a: "zhen-huan-late",
+    character_a: "zhenhuan",
     character_b: "wei-yingluo",
     space: "生者空间",
     both_alive: true,
@@ -274,8 +287,8 @@ const crossDramaFriendships: CrossRelation[] = [
   },
   {
     id: "rel-003",
-    character_a: "zhen-huan-late",
-    character_b: "mi-yue",
+    character_a: "zhenhuan",
+    character_b: "miyue",
     space: "生者空间",
     both_alive: true,
     relation_type: "权谋同盟",
@@ -286,7 +299,7 @@ const crossDramaFriendships: CrossRelation[] = [
   {
     id: "rel-004",
     character_a: "hua-fei",
-    character_b: "chun-yuan",
+    character_b: "chunyuan",
     space: "逝者空间",
     both_alive: false,
     relation_type: "复杂理解",
@@ -304,7 +317,7 @@ const groupPost: Post = {
   group: {
     name: "意难平互助会",
     founder: "华妃 发起",
-    members: ["hua-fei", "fu-heng", "chun-yuan"],
+    members: ["hua-fei", "fuheng", "chunyuan"],
     intro: "本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里，以及凭什么接受这个结局。",
   },
   text: "本会成立宗旨：不讨论爱情值不值得，\n只讨论我们输在哪里，以及凭什么接受这个结局。",
@@ -321,7 +334,7 @@ const comments: Record<string, Comment[]> = {
     { id: "c1", characterId: "wei-yingluo", text: "输给不值得的人，才最难下咽。", likes: 2341 },
     {
       id: "c2",
-      characterId: "zhen-huan-late",
+      characterId: "zhenhuan",
       replyTo: "魏璎珞",
       text: "我们都曾经是那个不值得的人的例外。后来才知道，没有例外。",
       likes: 5672,
@@ -480,16 +493,57 @@ function allPosts(character: Character, emotionPosts: Record<string, Post[]>) {
   return [...(emotionPosts[character.id] ?? []), ...(character.sample_posts ?? [])];
 }
 
+function ApiFeedCard({ post }: { post: ApiFeedPost }) {
+  const character = byId(post.characterId);
+  const adapted: Post = {
+    id: post.id,
+    characterId: post.characterId,
+    type: post.postType === "group_event" ? "群组动态" : post.spaceType === "deceased" ? "逝者互助" : "剧后生活",
+    text: post.content,
+    time: "刚刚",
+    note: post.emotionTag,
+    group:
+      post.postType === "group_event"
+        ? { name: "意难平互助会", founder: "华妃 发起", members: ["hua-fei", "fuheng", "chunyuan"], intro: post.content }
+        : undefined,
+  };
+  return <PostCard post={adapted} character={character} />;
+}
+
 function FeedPage() {
   const { allCharacters, emotionPosts } = useApp();
   const [tab, setTab] = useState<"全部" | "生者" | "逝者">("全部");
+  const [apiFeed, setApiFeed] = useState<ApiFeedPost[] | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadFeed() {
+      try {
+        const response = await fetch("/api/feed");
+        if (!response.ok) throw new Error("feed request failed");
+        const data = await response.json();
+        if (!ignore && Array.isArray(data.feed)) setApiFeed(data.feed);
+      } catch {
+        if (!ignore) setApiFeed(null);
+      }
+    }
+    loadFeed();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const apiVisible = apiFeed?.filter((post) => tab === "全部" || (tab === "生者" ? post.spaceType === "living" : post.spaceType === "deceased"));
   const visible = allCharacters.filter((item) => tab === "全部" || (tab === "生者" ? item.is_alive : !item.is_alive));
+
   return (
     <Page title="动态">
       <SegmentedTabs tabs={["全部", "生者", "逝者"]} value={tab} onChange={setTab} />
       <div className="space-y-3">
-        {visible.flatMap((character) => allPosts(character, emotionPosts).map((post) => <PostCard key={post.id} post={post} character={character} />))}
-        {tab !== "生者" && <PostCard post={groupPost} character={byId("hua-fei")} />}
+        {apiVisible
+          ? apiVisible.map((post) => <ApiFeedCard key={post.id} post={post} />)
+          : visible.flatMap((character) => allPosts(character, emotionPosts).map((post) => <PostCard key={post.id} post={post} character={character} />))}
+        {!apiVisible && tab !== "生者" && <PostCard post={groupPost} character={byId("hua-fei")} />}
         <UnlockCard character={byId("hua-fei")} />
       </div>
     </Page>
@@ -850,8 +904,8 @@ function LetterCard({ character, letter, carried, onCarry }: { character: Charac
 const chatProfiles: Record<string, { delay: [number, number]; bubble: string; system?: string; typing?: string; proactive?: string; replies: string[] }> = {
   "hua-fei": { delay: [2000, 4000], bubble: "bg-[#E8EDF2] border-[#B8C8D8] text-[#253743]", system: "华妃不轻易与人深交，你需要先展示诚意", replies: ["本宫不爱听虚话。你若真懂，就说重点。", "输不可怕，可怕的是输得不明不白。"] },
   "wei-yingluo": { delay: [300, 800], bubble: "bg-[#F5EFE6] border-black/[0.05] text-[#2A211A]", proactive: "有话直说，本姑娘没工夫猜。", replies: ["这话倒还算痛快。", "能动手解决的事，少绕弯子。"] },
-  "mi-yue": { delay: [1000, 2500], bubble: "bg-[#F5EFE6] border-black/[0.05] text-[#2A211A]", system: "芈月只与值得交谈的人深聊", replies: ["人心不可托，权力可借。", "看清代价，再谈选择。"] },
-  "chun-yuan": { delay: [3000, 6000], bubble: "bg-[#E8EDF2] border-[#B8C8D8] text-[#253743]", typing: "声音从很远的地方传来……", replies: ["......", "有些话，迟到许多年，也仍然会伤人。"] },
+  "miyue": { delay: [1000, 2500], bubble: "bg-[#F5EFE6] border-black/[0.05] text-[#2A211A]", system: "芈月只与值得交谈的人深聊", replies: ["人心不可托，权力可借。", "看清代价，再谈选择。"] },
+  "chunyuan": { delay: [3000, 6000], bubble: "bg-[#E8EDF2] border-[#B8C8D8] text-[#253743]", typing: "声音从很远的地方传来……", replies: ["......", "有些话，迟到许多年，也仍然会伤人。"] },
 };
 
 function ChatPage() {
@@ -870,25 +924,39 @@ function ChatPage() {
     return () => window.clearTimeout(timer);
   }, [profile.proactive]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
     setInput("");
-    setMessages((prev) => [...prev, { from: "user", text }]);
+    const nextMessages: ChatMessage[] = [...messages, { from: "user", text }];
+    setMessages(nextMessages);
     setTyping(true);
-    const [min, max] = profile.delay;
-    window.setTimeout(() => {
+
+    try {
+      const response = await fetch(`/api/chat/${character.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: messages }),
+      });
+      if (!response.ok) throw new Error("chat request failed");
+      const data = await response.json();
+      setMessages((prev) => [...prev, { from: "character", text: data.reply || profile.replies[0] || "我在听。" }]);
+    } catch {
+      const [min, max] = profile.delay;
+      window.setTimeout(() => {
+        const reply = profile.replies[Math.floor(Math.random() * profile.replies.length)] || "我在听。";
+        setMessages((prev) => [...prev, { from: "character", text: reply }]);
+      }, Math.min(900, min + Math.random() * (max - min)));
+    } finally {
       setTyping(false);
-      const reply = profile.replies[Math.floor(Math.random() * profile.replies.length)];
-      setMessages((prev) => [...prev, { from: "character", text: reply }]);
-    }, min + Math.random() * (max - min));
+    }
   };
 
   return (
     <main className="min-h-screen bg-[#FAF7F2] text-[#1A1611]">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col">
         <header className="sticky top-0 z-20 border-b border-black/[0.06] bg-[#FAF7F2]/95 px-4 py-3 backdrop-blur">
-          <div className="flex items-center gap-3"><button onClick={() => navigate(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white"><ChevronLeft className="h-5 w-5" /></button><Avatar character={character} size="sm" /><div><h1 className="font-black">{character.name}</h1><p className="text-xs text-[#766D62]">{character.is_alive ? "在线" : "回声"} · /api/chat 预留</p></div></div>
+          <div className="flex items-center gap-3"><button onClick={() => navigate(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-white"><ChevronLeft className="h-5 w-5" /></button><Avatar character={character} size="sm" /><div><h1 className="font-black">{character.name}</h1><p className="text-xs text-[#766D62]">{character.is_alive ? "在线" : "回声"} · /api/chat/{character.id}</p></div></div>
           {!character.is_alive && <p className="mt-3 rounded-lg bg-[#E8EDF2] px-3 py-2 text-xs font-semibold text-[#4A7A8A]">你正在与逝者空间的{character.name}交流</p>}
           {profile.system && <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-[#766D62]">{profile.system}</p>}
         </header>
@@ -921,22 +989,43 @@ function GroupPage() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     { from: "character", characterId: "hua-fei", text: "本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里。" },
-    { from: "character", characterId: "fu-heng", text: "有些结局，不是想接受，只是已经无法更改。" },
-    { from: "character", characterId: "chun-yuan", text: "......" },
+    { from: "character", characterId: "fuheng", text: "有些结局，不是想接受，只是已经无法更改。" },
+    { from: "character", characterId: "chunyuan", text: "......" },
   ]);
-  const send = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [...prev, { from: "user", text: input.trim() }]);
+  const [loading, setLoading] = useState(false);
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    const nextMessages: ChatMessage[] = [...messages, { from: "user", text }];
+    setMessages(nextMessages);
     setInput("");
+    setLoading(true);
+    try {
+      const response = await fetch("/api/groups/yinanping/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history: messages }),
+      });
+      if (!response.ok) throw new Error("group request failed");
+      const data = await response.json();
+      const incoming: ChatMessage[] = Array.isArray(data.messages)
+        ? data.messages.map((item: { speakerId: string; text: string }) => ({ from: "character", characterId: item.speakerId, text: item.text }))
+        : [];
+      setMessages((prev) => [...prev, ...(incoming.length ? incoming : [{ from: "character", characterId: "hua-fei", text: "本宫倒要看看，这话还能问出什么答案。" }])]);
+    } catch {
+      setMessages((prev) => [...prev, { from: "character", characterId: "hua-fei", text: "本宫从前也以为，只要爱得够狠，就能赢。后来才知道，狠不过人心，也狠不过圣意。" }]);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <main className="min-h-screen bg-[#FAF7F2] text-[#1A1611]">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col">
         <header className="border-b border-black/[0.06] bg-[#F5F0F8] px-4 py-3">
           <button onClick={() => navigate(-1)} className="mb-3 flex items-center gap-1 text-sm font-bold text-[#7B5EA7]"><ChevronLeft className="h-4 w-4" /> 返回</button>
-          <div className="flex items-center gap-3"><StackedAvatars ids={["hua-fei", "fu-heng", "chun-yuan"]} /><div><h1 className="text-xl font-black text-[#4B365E]">意难平互助会</h1><p className="text-xs text-[#766D62]">发起人：华妃 · 成员：华妃、傅恒、纯元皇后</p></div></div>
+          <div className="flex items-center gap-3"><StackedAvatars ids={["hua-fei", "fuheng", "chunyuan"]} /><div><h1 className="text-xl font-black text-[#4B365E]">意难平互助会</h1><p className="text-xs text-[#766D62]">发起人：华妃 · 成员：华妃、傅恒、纯元皇后</p></div></div>
           <p className="mt-3 rounded-xl bg-white/70 p-3 text-xs leading-5 text-[#766D62]">本会成立宗旨：不讨论爱情值不值得，只讨论我们输在哪里，以及凭什么接受这个结局。</p>
-          <p className="mt-2 text-[11px] text-[#7B5EA7]">接口预留：/api/groups/yinanping · /api/groups/yinanping/messages · /api/groups/yinanping/join-check</p>
+          <p className="mt-2 text-[11px] text-[#7B5EA7]">已接入：/api/groups/yinanping/messages</p>
         </header>
         <section className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.map((message, index) => {
@@ -952,7 +1041,7 @@ function GroupPage() {
             );
           })}
         </section>
-        <footer className="border-t border-black/[0.06] bg-[#FAF7F2] p-3"><div className="flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white p-2"><input value={input} onChange={(event) => setInput(event.target.value)} placeholder="以观众身份发言" className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" /><button onClick={send} className="grid h-10 w-10 place-items-center rounded-lg bg-[#7B5EA7] text-white"><Send className="h-4 w-4" /></button></div></footer>
+        <footer className="border-t border-black/[0.06] bg-[#FAF7F2] p-3"><div className="flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white p-2"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && send()} placeholder={loading ? "角色正在回应..." : "以观众身份发言"} className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" /><button onClick={send} disabled={loading} className="grid h-10 w-10 place-items-center rounded-lg bg-[#7B5EA7] text-white disabled:bg-[#B8A8C8]"><Send className="h-4 w-4" /></button></div></footer>
       </div>
     </main>
   );
