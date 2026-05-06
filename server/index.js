@@ -11,7 +11,7 @@ import { buildCharacterSystemPrompt } from "./services/promptBuilder.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
-
+console.log("🔥 NEW SERVER VERSION 🔥");
 dotenv.config();
 
 const app = express();
