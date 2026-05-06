@@ -81,7 +81,7 @@ function Bubble({
 }
 
 export function ChatPage() {
-  const { allCharacters, incrementInteraction } = useApp();
+  const { allCharacters, incrementInteraction, addPendingCard } = useApp();
   const { characterId } = useParams();
   const navigate = useNavigate();
   const character = allCharacters.find((c) => c.id === characterId) ?? allCharacters[0];
@@ -182,6 +182,7 @@ export function ChatPage() {
       ]);
 
       if (decision === "accepted" || decision === "interested") {
+        addPendingCard({ ...cardPayload, decision, responseText });
         window.setTimeout(() => {
           setMessages((prev) => [
             ...prev,

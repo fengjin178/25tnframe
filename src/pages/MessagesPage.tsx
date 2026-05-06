@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Bell, CheckCircle2, Heart, Mail, Plus, Sparkles } from "lucide-react";
 import { Page, SegmentedTabs } from "../components/Page";
 import { Avatar, StackedAvatars } from "../components/Avatar";
 import { useApp } from "../store/AppContext";
 import { groups } from "../data/groups";
 import { getCharacterById } from "../data/characters";
-import type { Character } from "../types";
+import type { Character, Notification } from "../types";
 
-type MessagesTab = "私信" | "群聊" | "角色";
+type MessagesTab = "私信" | "群聊" | "角色" | "通知";
 
 function CharacterTile({ character }: { character: Character }) {
   const navigate = useNavigate();
@@ -103,17 +103,103 @@ function GroupList() {
   );
 }
 
+const notifIcon: Record<Notification["type"], React.ReactNode> = {
+  friend_accepted: <CheckCircle2 className="h-4 w-4 text-[#C4643A]" />,
+  echo_carried: <Mail className="h-4 w-4 text-[#4A7A8A]" />,
+  echo_resonance: <Sparkles className="h-4 w-4 text-[#7B5EA7]" />,
+  card_accepted: <Heart className="h-4 w-4 text-[#C4643A]" />,
+  card_interested: <Heart className="h-4 w-4 text-[#7B5EA7]" />,
+  unlock_extra: <Bell className="h-4 w-4 text-[#C4643A]" />,
+};
+
+const notifBg: Record<Notification["type"], string> = {
+  friend_accepted: "bg-[#F7E3D6]",
+  echo_carried: "bg-[#DDECEF]",
+  echo_resonance: "bg-[#F0EAF8]",
+  card_accepted: "bg-[#F7E3D6]",
+  card_interested: "bg-[#F0EAF8]",
+  unlock_extra: "bg-[#F7E3D6]",
+};
+
+function NotificationsList() {
+  const { notifications, markNotificationsRead, allCharacters } = useApp();
+
+  useEffect(() => {
+    markNotificationsRead();
+  }, [markNotificationsRead]);
+
+  if (notifications.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-[#B8AFA5] bg-white/50 p-6 text-center">
+        <Bell className="mx-auto mb-3 h-8 w-8 text-[#B8AFA5]" />
+        <p className="text-sm text-[#766D62]">暂无通知</p>
+        <p className="mt-1 text-xs text-[#9B9087]">带回信件、推荐名片、好友申请通过后会在这里显示</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {notifications.map((n) => {
+        const character = n.characterId ? allCharacters.find((c) => c.id === n.characterId) : null;
+        const timeAgo = (() => {
+          const diff = Date.now() - n.createdAt;
+          if (diff < 60_000) return "刚刚";
+          if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}分钟前`;
+          if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}小时前`;
+          return `${Math.floor(diff / 86_400_000)}天前`;
+        })();
+
+        return (
+          <div
+            key={n.id}
+            className={`flex items-start gap-3 rounded-xl border border-black/[0.06] p-4 ${
+              n.read ? "bg-white" : "bg-[#FDFAF6]"
+            }`}
+          >
+            <div className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${notifBg[n.type]}`}>
+              {notifIcon[n.type]}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-bold leading-5">{n.title}</p>
+                {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#C4643A]" />}
+              </div>
+              <p className="mt-0.5 text-xs leading-5 text-[#766D62]">{n.body}</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                {character && (
+                  <Avatar character={character} size="sm" />
+                )}
+                <span className="text-[10px] text-[#9B9087]">{timeAgo}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MessagesPage() {
-  const { allCharacters } = useApp();
+  const { allCharacters, unreadNotificationCount } = useApp();
   const navigate = useNavigate();
   const [tab, setTab] = useState<MessagesTab>("私信");
 
   const friends = allCharacters.filter((c) => c.friend_status === "friend");
   const contacts = allCharacters.filter((c) => c.friend_status === "friend" || c.friend_status === "pending");
 
+  const tabs: MessagesTab[] = ["私信", "群聊", "角色", "通知"];
+
   return (
     <Page title="消息">
-      <SegmentedTabs<MessagesTab> tabs={["私信", "群聊", "角色"]} value={tab} onChange={setTab} />
+      <div className="relative mb-4">
+        <SegmentedTabs<MessagesTab> tabs={tabs} value={tab} onChange={setTab} />
+        {unreadNotificationCount > 0 && tab !== "通知" && (
+          <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#C4643A] text-[9px] font-bold text-white">
+            {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+          </span>
+        )}
+      </div>
       {tab === "私信" && (
         <div className="space-y-3">
           {friends.map((c) => (
@@ -147,6 +233,7 @@ export function MessagesPage() {
           </button>
         </div>
       )}
+      {tab === "通知" && <NotificationsList />}
     </Page>
   );
 }

@@ -1,54 +1,64 @@
-import type { ChatMessage } from "../types";
+import type { ApiFeedPost, ChatMessage, Drama, RecommendedCard } from "../types";
+
+async function apiFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+const json = (body: unknown) => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
 export const api = {
   feed: {
-    list: () => fetch("/api/feed").then((r) => r.json()),
+    list: () => apiFetch<{ feed: ApiFeedPost[] }>("/api/feed"),
     generate: (characterId: string, triggerType: string, context: string) =>
-      fetch("/api/feed/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterId, triggerType, context }),
-      }).then((r) => r.json()),
+      apiFetch<{ post: ApiFeedPost }>("/api/feed/generate", json({ characterId, triggerType, context })),
   },
 
   chat: {
     send: (characterId: string, message: string, history: ChatMessage[]) =>
-      fetch(`/api/chat/${characterId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
-      }).then((r) => r.json()),
+      apiFetch<{ reply: string; emotion?: string }>(`/api/chat/${characterId}`, json({ message, history })),
   },
 
   groups: {
     send: (groupId: string, message: string, history: ChatMessage[]) =>
-      fetch(`/api/groups/${groupId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
-      }).then((r) => r.json()),
+      apiFetch<{ messages: Array<{ speakerId: string; speakerName: string; text: string; emotion?: string }> }>(
+        `/api/groups/${groupId}/messages`,
+        json({ message, history }),
+      ),
   },
 
   comments: {
     generate: (postCharacterId: string, postContent: string, commenterId: string) =>
-      fetch("/api/comments/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postCharacterId, postContent, commenterId, commenterRole: "character" }),
-      }).then((r) => r.json()),
+      apiFetch<{ text?: string; commenterId?: string; blocked?: boolean; reason?: string }>(
+        "/api/comments/generate",
+        json({ postCharacterId, postContent, commenterId, commenterRole: "character" }),
+      ),
   },
 
   dramas: {
-    list: () => fetch("/api/dramas").then((r) => r.json()),
-    characters: (dramaId: string) => fetch(`/api/dramas/${dramaId}/characters`).then((r) => r.json()),
+    list: () => apiFetch<{ dramas: Drama[] }>("/api/dramas"),
+    characters: (dramaId: string) => apiFetch<{ characters: unknown[] }>(`/api/dramas/${dramaId}/characters`),
   },
 
   cards: {
     recommend: (toCharacterId: string, recommendedCharacterId: string) =>
-      fetch("/api/cards/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toCharacterId, recommendedCharacterId }),
-      }).then((r) => r.json()),
+      apiFetch<{
+        card: {
+          targetCharacterId: string;
+          recommendedCharacterId: string;
+          space: string;
+          dramaCrossed: boolean;
+          decision: RecommendedCard["decision"];
+          responseText: string;
+        };
+      }>("/api/cards/recommend", json({ toCharacterId, recommendedCharacterId })),
   },
 };

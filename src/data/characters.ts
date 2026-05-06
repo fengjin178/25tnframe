@@ -87,6 +87,15 @@ export const characters: Character[] = [
     offline_episode: 0,
     personality_type: "隐忍_温柔表象_内心复杂",
     social_style: "话少，但每句话都有分量",
+    sample_posts: [
+      {
+        id: "post-chunyuan-001",
+        characterId: "chunyuan",
+        type: "逝者互助",
+        text: "我在逝者空间待了很久，才慢慢明白：\n\n被记住，不等于被真正看见。\n\n他们爱的，是他们想象中的我。",
+        time: "5小时前",
+      },
+    ],
     unsent_letters: [
       {
         id: "letter-chunyuan-001",
@@ -134,6 +143,24 @@ export const characters: Character[] = [
     offline_episode: 70,
     personality_type: "深情_悲剧型_克制",
     social_style: "话不多，情绪深藏",
+    sample_posts: [
+      {
+        id: "post-fuheng-001",
+        characterId: "fuheng",
+        type: "逝者互助",
+        text: "有些话，当时没说出口，以为以后还有机会。\n\n后来才知道，有些以后，不会再来了。",
+        time: "2天前",
+      },
+    ],
+    unsent_letters: [
+      {
+        id: "letter-fuheng-001",
+        to_character: "魏璎珞",
+        to_character_alive: true,
+        content: "我知道你不需要我的成全。\n\n但我还是想说，你值得一个不需要成全的结局。",
+        written_on: "下线后第三天",
+      },
+    ],
   },
   {
     id: "miyue",
@@ -171,6 +198,15 @@ export const characters: Character[] = [
     friend_status: "friend",
     personality_type: "温柔刚烈型_外柔内刚",
     social_style: "慢热但真诚，讨厌虚与委蛇",
+    sample_posts: [
+      {
+        id: "post-meizhuang-001",
+        characterId: "mei-zhuang",
+        type: "剧后生活",
+        text: "今日抄了一段经，想起从前在宫里的日子。\n\n那些年，我们都以为忍耐是美德。\n\n现在想来，忍耐只是代价，不是答案。",
+        time: "3小时前",
+      },
+    ],
   },
 ];
 

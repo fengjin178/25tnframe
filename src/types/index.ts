@@ -129,15 +129,41 @@ export type Group = {
   textColor: string;
 };
 
+export type NotificationType =
+  | "friend_accepted"
+  | "echo_carried"
+  | "card_accepted"
+  | "card_interested"
+  | "echo_resonance"
+  | "unlock_extra";
+
+export type Notification = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  characterId?: string;
+  relatedId?: string;
+  createdAt: number;
+  read: boolean;
+};
+
 export type AppState = {
   allCharacters: Character[];
   emotionPosts: Record<string, Post[]>;
   carriedLetterIds: string[];
   carriedCount: number;
   interactionCounts: Record<string, number>;
+  pendingCards: RecommendedCard[];
+  notifications: Notification[];
+  unreadNotificationCount: number;
   incrementInteraction: (characterId: string) => void;
   requestFriend: (character: Character) => void;
+  acceptFriend: (characterId: string) => void;
   carryLetter: (from: Character, letter: Letter) => void;
+  addPendingCard: (card: RecommendedCard) => void;
+  addNotification: (n: Omit<Notification, "id" | "createdAt" | "read">) => void;
+  markNotificationsRead: () => void;
   showToast: (message: string) => void;
   toast: string | null;
   clearToast: () => void;
