@@ -1,7 +1,11 @@
 import type { ApiFeedPost, Character, ChatMessage, Drama, RecommendedCard } from "../types";
 
+const API_BASE = "https://two5tnframe.onrender.com";
+
 async function apiFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, init);
+  const url = typeof input === "string" ? `${API_BASE}${input}` : input;
+
+  const res = await fetch(url, init);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`API ${res.status}: ${text}`);
