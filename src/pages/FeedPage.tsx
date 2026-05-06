@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Page, SegmentedTabs } from "../components/Page";
 import { PostCard } from "../components/PostCard";
 import { useApp } from "../store/AppContext";
-import type { Post } from "../types";
+import { api } from "../services/api";
+import type { ApiFeedPost, Post } from "../types";
 
 type FeedTab = "生者动态" | "逝者回声" | "共鸣动态";
 
@@ -20,19 +21,45 @@ const groupPost: Post = {
   },
 };
 
-function allPosts(character: ReturnType<typeof useApp>["allCharacters"][number], emotionPosts: Record<string, Post[]>): Post[] {
-  return [...(character.sample_posts ?? []), ...(emotionPosts[character.id] ?? [])];
+function apiFeedToPost(item: ApiFeedPost): Post {
+  return {
+    id: item.id,
+    characterId: item.characterId,
+    type: "剧后生活",
+    text: item.content,
+    time: "刚刚",
+    stats: { likes: 0, comments: 0, shares: 0 },
+  };
 }
 
 export function FeedPage() {
   const { allCharacters, emotionPosts } = useApp();
   const [tab, setTab] = useState<FeedTab>("生者动态");
+  const [apiFeed, setApiFeed] = useState<ApiFeedPost[]>([]);
+
+  useEffect(() => {
+    api.feed.list().then((data) => setApiFeed(data.feed)).catch(() => {});
+  }, []);
 
   const livingChars = allCharacters.filter((c) => c.is_alive);
   const deceasedChars = allCharacters.filter((c) => !c.is_alive);
 
-  const livingPosts = livingChars.flatMap((c) => allPosts(c, emotionPosts).map((p) => ({ post: p, character: c })));
-  const deceasedPosts = deceasedChars.flatMap((c) => allPosts(c, emotionPosts).map((p) => ({ post: p, character: c })));
+  const apiFeedByChar = apiFeed.reduce<Record<string, Post[]>>((acc, item) => {
+    const post = apiFeedToPost(item);
+    acc[item.characterId] = [...(acc[item.characterId] ?? []), post];
+    return acc;
+  }, {});
+
+  function allPostsWithApi(character: ReturnType<typeof useApp>["allCharacters"][number]): Post[] {
+    return [
+      ...(character.sample_posts ?? []),
+      ...(apiFeedByChar[character.id] ?? []),
+      ...(emotionPosts[character.id] ?? []),
+    ];
+  }
+
+  const livingPosts = livingChars.flatMap((c) => allPostsWithApi(c).map((p) => ({ post: p, character: c })));
+  const deceasedPosts = deceasedChars.flatMap((c) => allPostsWithApi(c).map((p) => ({ post: p, character: c })));
   const echoPosts = allCharacters.flatMap((c) =>
     (emotionPosts[c.id] ?? []).map((p) => ({ post: p, character: c })),
   );

@@ -116,7 +116,7 @@ export const characters: Character[] = [
     is_alive: true,
     space: "living",
     status: "online",
-    friend_status: "none",
+    friend_status: "pending",
     personality_type: "反套路行动型_强自尊_不屑隐忍",
     social_style: "互怼但带欣赏，对强者直接认可",
     sample_posts: [

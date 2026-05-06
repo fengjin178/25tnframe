@@ -78,8 +78,25 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+function toFrontendCharacter(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    initial: c.name.slice(0, 1),
+    drama: c.source,
+    dramaId: c.source === "甄嬛传" ? "zhen-huan-zhuan" : c.source === "延禧攻略" ? "yan-xi-gong-lue" : "mi-yue-zhuan",
+    role: c.identity ?? "",
+    is_alive: c.status === "living",
+    space: c.spaceType,
+    status: c.status === "living" ? "online" : "echo",
+    friend_status: "none",
+    personality_type: Array.isArray(c.personality) ? c.personality.join("_") : "",
+    social_style: c.speechStyle ?? "",
+  };
+}
+
 app.get("/api/characters", (_req, res) => {
-  res.json({ characters });
+  res.json({ characters: characters.map(toFrontendCharacter) });
 });
 
 app.get("/api/feed", (_req, res) => {
@@ -119,9 +136,20 @@ app.post("/api/groups/:groupId/messages", async (req, res) => {
   const { message = "", history = [] } = req.body ?? {};
   const speakers = chooseGroupSpeakers(group, message);
   const speakerBrief = speakers.map((character) => `${character.id}:${character.name}:${character.speechStyle}`).join("\n");
-  const groupPrompt = `你是“第25帧”群聊编排器。请根据观众输入生成 1-3 条群聊消息，只能使用候选角色。群聊不是每个人机械答题，要有关系张力，第二个角色可以回应第一个角色。
 
-世界观边界：不复活角色，不改写原剧情；生者和逝者不能直接建立现实通信，只能在观众空间形成观点交锋；不得自称 AI；甄嬛只有 zhenhuan，必须是完结后的最终人格。
+  const isMixed = group.spaceType === "mixed";
+  const crossSpaceNote = isMixed ? (() => {
+    const living = speakers.filter((c) => c.status === "living").map((c) => c.name).join("、");
+    const deceased = speakers.filter((c) => c.status === "deceased").map((c) => c.name).join("、");
+    const parts = [];
+    if (living) parts.push(`生者（${living}）`);
+    if (deceased) parts.push(`逝者（${deceased}）`);
+    return `\n【跨空间约束】本群包含 ${parts.join(" 与 ")}。生者与逝者不能直接对话或建立现实通信，只能在第25帧观众空间形成观点交锋——即各自发表看法，但不能用"你"直接回应对方、不能互相称呼对方名字进行对话、不能假装对方能听见自己。`;
+  })() : "";
+
+  const groupPrompt = `你是"第25帧"群聊编排器。请根据观众输入生成 1-3 条群聊消息，只能使用候选角色。群聊不是每个人机械答题，要有关系张力，第二个角色可以回应第一个角色。
+
+世界观边界：不复活角色，不改写原剧情；生者和逝者不能直接建立现实通信，只能在观众空间形成观点交锋；不得自称 AI；甄嬛只有 zhenhuan，必须是完结后的最终人格。${crossSpaceNote}
 
 群聊：${group.name}
 群规：${group.rules.map((rule) => `- ${rule}`).join("\n")}

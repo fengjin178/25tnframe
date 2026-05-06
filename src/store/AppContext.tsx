@@ -80,15 +80,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saved.notifications ?? [],
   );
   const [toast, setToast] = useState<string | null>(null);
+  const [remoteCharacters, setRemoteCharacters] = useState<Character[]>([]);
+
+  // Fetch characters from backend on mount; merge with local UI-only fields
+  useEffect(() => {
+    api.characters.list().then(({ characters: remote }) => {
+      const merged = remote.map((remoteChar) => {
+        const local = characters.find((c) => c.id === remoteChar.id);
+        return {
+          ...remoteChar,
+          // preserve UI-only fields that only exist in local data
+          initial: local?.initial ?? remoteChar.initial,
+          dramaId: local?.dramaId ?? remoteChar.dramaId,
+          role: local?.role ?? remoteChar.role,
+          friend_status: local?.friend_status ?? remoteChar.friend_status,
+          sample_posts: local?.sample_posts,
+          unsent_letters: local?.unsent_letters,
+          offline_episode: local?.offline_episode,
+          forbidden_relations: local?.forbidden_relations,
+        };
+      });
+      setRemoteCharacters(merged);
+    }).catch(() => {});
+  }, []);
 
   // Persist all state slices on change
   useEffect(() => {
     saveState({ friendOverrides, interactionCounts, carriedLetterIds, emotionPosts, notifications, pendingCards });
   }, [friendOverrides, interactionCounts, carriedLetterIds, emotionPosts, notifications, pendingCards]);
 
+  const baseCharacters = remoteCharacters.length > 0 ? remoteCharacters : characters;
+
   const allCharacters = useMemo(
-    () => characters.map((item) => ({ ...item, friend_status: friendOverrides[item.id] ?? item.friend_status })),
-    [friendOverrides],
+    () => baseCharacters.map((item) => ({ ...item, friend_status: friendOverrides[item.id] ?? item.friend_status })),
+    [baseCharacters, friendOverrides],
   );
 
   // ── Stable callbacks ──────────────────────────────────────────────────────
@@ -119,8 +144,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const acceptFriend = useCallback((characterId: string) => {
+    const character = allCharacters.find((c) => c.id === characterId) ?? characters.find((c) => c.id === characterId);
     setFriendOverrides((prev) => ({ ...prev, [characterId]: "friend" }));
-  }, []);
+    if (character) {
+      addNotification({
+        type: "friend_accepted",
+        title: `你已通过${character.name}的好友申请`,
+        body: `${character.name}现在会出现在私信列表，可以直接进行角色对话`,
+        characterId,
+      });
+      showToast(`已通过${character.name}的好友申请`);
+    }
+  }, [allCharacters, addNotification, showToast]);
 
   // ── Auto-accept pending friends after 3 interactions ─────────────────────
   // Use a ref to track which characters have already been auto-accepted this session

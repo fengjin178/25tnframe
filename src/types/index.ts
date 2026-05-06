@@ -121,8 +121,10 @@ export type Group = {
   id: string;
   name: string;
   founder: string;
-  status: string;
+  status: "已加入" | "未申请" | "审核中" | "锁定";
   deadOnly: boolean;
+  spaceType: "living" | "deceased" | "mixed";
+  rules: string[];
   members: string[];
   color: string;
   bgColor: string;

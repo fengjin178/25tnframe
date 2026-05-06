@@ -7,13 +7,23 @@ import { useApp } from "../store/AppContext";
 import { dramas } from "../data/dramas";
 import { groups } from "../data/groups";
 import { getCharacterById } from "../data/characters";
-import type { Character } from "../types";
+import type { Character, Group } from "../types";
 
 type ExploreTab = "剧集" | "角色" | "群聊";
 
+function canEnterGroup(status: Group["status"]) {
+  return status === "已加入";
+}
+
+function groupLockHint(group: Group) {
+  if (group.status === "审核中") return "该群仍在审核中，暂时不能进入";
+  if (group.spaceType === "mixed") return "该群属于观众空间议题组，需先申请后才可查看观点摘录";
+  return "请先申请加入该群，当前不能直接进入";
+}
+
 function DramaAccordion() {
   const navigate = useNavigate();
-  const { allCharacters, requestFriend } = useApp();
+  const { allCharacters, requestFriend, showToast } = useApp();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
@@ -76,13 +86,19 @@ function DramaAccordion() {
                       {dramaGroups.map((g) => (
                         <button
                           key={g.id}
-                          onClick={() => navigate(`/group/${g.id}`)}
-                          className="flex w-full items-center gap-2 rounded-lg border border-black/[0.06] bg-[#FAF7F2] p-2 text-left"
+                          onClick={() => {
+                            if (canEnterGroup(g.status)) {
+                              navigate(`/group/${g.id}`);
+                              return;
+                            }
+                            showToast(groupLockHint(g));
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-lg border border-black/[0.06] bg-[#FAF7F2] p-2 text-left ${canEnterGroup(g.status) ? "" : "opacity-75"}`}
                         >
                           <StackedAvatars ids={g.members} getChar={getCharacterById} />
                           <div>
                             <p className="text-xs font-bold">{g.name}</p>
-                            <p className="text-[10px] text-[#766D62]">{g.founder}</p>
+                            <p className="text-[10px] text-[#766D62]">{g.founder} · {g.status}</p>
                           </div>
                         </button>
                       ))}
@@ -121,7 +137,7 @@ function CharacterCard({ character, onNavigate, onRequest }: { character: Charac
 
 function GroupList() {
   const navigate = useNavigate();
-  const { interactionCounts } = useApp();
+  const { interactionCounts, showToast } = useApp();
   const yinanpingProgress = Math.min(
     (interactionCounts["hua-fei"] ?? 0) + (interactionCounts["fuheng"] ?? 0) + (interactionCounts["chunyuan"] ?? 0),
     5,
@@ -132,8 +148,14 @@ function GroupList() {
       {groups.map((group) => (
         <button
           key={group.id}
-          onClick={() => navigate(`/group/${group.id}`)}
-          className="w-full rounded-xl border border-black/[0.08] bg-white p-4 text-left"
+          onClick={() => {
+            if (canEnterGroup(group.status)) {
+              navigate(`/group/${group.id}`);
+              return;
+            }
+            showToast(groupLockHint(group));
+          }}
+          className={`w-full rounded-xl border border-black/[0.08] bg-white p-4 text-left ${canEnterGroup(group.status) ? "" : "opacity-75"}`}
         >
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
@@ -142,7 +164,7 @@ function GroupList() {
                 <h2 className="font-black">{group.name}</h2>
               </div>
               <p className="mt-1 text-xs text-[#766D62]">
-                {group.founder} · {group.deadOnly ? "仅逝者可加入" : "生者可申请"}
+                {group.founder} · {group.spaceType === "mixed" ? "观众空间议题组" : group.deadOnly ? "仅逝者可加入" : "生者可申请"}
               </p>
             </div>
             <span
@@ -215,7 +237,7 @@ function AllCharacters() {
                 character.is_alive ? "bg-[#C4643A]" : "bg-[#4A7A8A]"
               }`}
             >
-              {character.friend_status === "friend" ? "已是好友" : character.friend_status === "pending" ? "等待中" : "申请加好友"}
+              {character.friend_status === "friend" ? "已是好友" : character.friend_status === "pending" ? "待通过" : "申请加好友"}
             </button>
           </section>
         ))}

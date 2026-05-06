@@ -1,4 +1,4 @@
-import type { ApiFeedPost, ChatMessage, Drama, RecommendedCard } from "../types";
+import type { ApiFeedPost, Character, ChatMessage, Drama, RecommendedCard } from "../types";
 
 async function apiFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -16,6 +16,10 @@ const json = (body: unknown) => ({
 });
 
 export const api = {
+  characters: {
+    list: () => apiFetch<{ characters: Character[] }>("/api/characters"),
+  },
+
   feed: {
     list: () => apiFetch<{ feed: ApiFeedPost[] }>("/api/feed"),
     generate: (characterId: string, triggerType: string, context: string) =>

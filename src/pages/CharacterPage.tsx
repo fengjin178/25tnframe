@@ -157,6 +157,11 @@ export function CharacterPage() {
               {character.friend_status === "friend" ? "已是好友" : character.friend_status === "pending" ? "申请中" : "申请好友"}
             </button>
           </div>
+          {!character.is_alive && (
+            <div className="mt-3 rounded-xl bg-[#EDF0F5] px-3 py-3 text-xs leading-5 text-[#4A7A8A]">
+              想激活逝者的信：切到下方“未寄出的信”标签。只有写给生者的信，才能由观众带回生者空间，触发一条“共鸣动态”。
+            </div>
+          )}
         </section>
 
         <SegmentedTabs tabs={tabs} value={tab} onChange={(t) => setTab(t as typeof tab)} />
@@ -172,6 +177,9 @@ export function CharacterPage() {
         {tab === "关系" && <RelationGraph character={character} />}
         {tab === "未寄出的信" && (
           <div className="space-y-3">
+            <div className="rounded-xl border border-[#B8C8D8] bg-[#F7FAFC] px-4 py-3 text-xs leading-5 text-[#4A7A8A]">
+              这里是逝者留在第25帧里的未寄出回声。观众不能替他们改写结局，只能把“写给生者”的信带回去，让生者感知到一丝迟来的回响。
+            </div>
             {(character.unsent_letters ?? []).map((letter) => (
               <LetterCard
                 key={letter.id}

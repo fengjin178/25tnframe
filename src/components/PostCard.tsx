@@ -174,7 +174,16 @@ export function PostCard({ character, post }: { character: Character; post: Post
         </div>
       )}
       {isGroup && post.group ? (
-        <button onClick={() => navigate("/group/yinanping")} className="mb-3 w-full text-left">
+        <button
+          onClick={() => {
+            if (post.group?.id === "yinanping") {
+              navigate("/group/yinanping");
+              return;
+            }
+            showToast("该群动态仅作展示，请从“消息-群聊”中按准入状态进入");
+          }}
+          className="mb-3 w-full text-left"
+        >
           <div className="mb-2 inline-flex rounded-full bg-white/80 px-2 py-1 text-[11px] font-bold text-[#7B5EA7]">
             群组动态
           </div>

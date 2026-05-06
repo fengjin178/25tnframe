@@ -1,5 +1,3 @@
-import fetch from "node-fetch"; // 如果你用 Node 18+ 可以直接用全局 fetch
-
 function fallbackText(messages = [], options = {}) {
   if (options.fallbackText) return options.fallbackText;
   const user = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";

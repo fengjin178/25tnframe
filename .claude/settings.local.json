@@ -19,7 +19,15 @@
       "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\('characters count:', j.characters.length, j.characters.map\\(c=>c.name\\).join\\(', '\\)\\)\")",
       "Bash(kill %1)",
       "Bash(node -e \"const j=JSON.parse\\(require\\('fs'\\).readFileSync\\('/tmp/chars.json','utf8'\\)\\); console.log\\('characters count:', j.characters.length\\); j.characters.forEach\\(c=>console.log\\(' -', c.id, c.name, c.spaceType\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('count:', len\\(d['characters']\\)\\); [print\\(' -', c['id'], c['name'], c.get\\('spaceType','?'\\)\\) for c in d['characters']]\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('count:', len\\(d['characters']\\)\\); [print\\(' -', c['id'], c['name'], c.get\\('spaceType','?'\\)\\) for c in d['characters']]\")",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node --input-type=module --experimental-vm-modules -)",
+      "Bash(node --input-type=module -)",
+      "Bash(curl *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\('count:', p.characters.length, '| fields:', Object.keys\\(p.characters[0]\\).join\\(', '\\)\\)\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\('feed count:', p.feed?.length\\)\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); p.messages?.forEach\\(m => console.log\\(m.speakerName+':', m.text.slice\\(0,40\\)+'...'\\)\\)\")"
     ]
   }
 }
