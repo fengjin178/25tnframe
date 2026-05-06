@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "server": "node server/index.js",
+    "start": "node server/index.js",
     "dev:all": "concurrently -n frontend,backend -c cyan,yellow \"npm run dev\" \"npm run server\"",
     "build": "vite build",
     "lint": "eslint .",
