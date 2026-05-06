@@ -313,13 +313,6 @@ ${recommendedCharacter.name}的角色特质：${recommendedCharacter.personality
   });
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const clientDist = path.resolve(__dirname, "../dist");
-app.use(express.static(clientDist));
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(clientDist, "index.html"));
-});
 
 app.listen(port, () => {
   console.log(`API server running at http://localhost:${port}`);
