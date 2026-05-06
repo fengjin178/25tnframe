@@ -8,6 +8,9 @@ import { dramas } from "./data/dramas.js";
 import { generateChatCompletion } from "./services/aiClient.js";
 import { getRelevantMemories } from "./services/memoryRetriever.js";
 import { buildCharacterSystemPrompt } from "./services/promptBuilder.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
 
 dotenv.config();
 
@@ -106,7 +109,8 @@ app.get("/api/feed", (_req, res) => {
 app.post("/api/chat/:characterId", async (req, res) => {
   const character = getCharacterById(req.params.characterId);
   if (!character) return res.status(404).json({ error: "Character not found" });
-
+  
+  
   const { message = "", history = [] } = req.body ?? {};
   const memories = getRelevantMemories(character.id, message, { history });
   const systemPrompt = buildCharacterSystemPrompt(character, memories, { sceneType: "private_chat" });
@@ -128,6 +132,7 @@ app.post("/api/chat/:characterId", async (req, res) => {
     emotion: inferEmotion(character, `${message}${reply}`),
   });
 });
+
 
 app.post("/api/groups/:groupId/messages", async (req, res) => {
   const group = getGroupById(req.params.groupId);
@@ -306,6 +311,14 @@ ${recommendedCharacter.name}的角色特质：${recommendedCharacter.personality
       responseText: parsed.responseText ?? `${toCharacter.name}沉默片刻，将名片收了起来。`,
     },
   });
+});
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDist = path.resolve(__dirname, "../dist");
+app.use(express.static(clientDist));
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(clientDist, "index.html"));
 });
 
 app.listen(port, () => {
